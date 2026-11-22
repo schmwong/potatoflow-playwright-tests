@@ -29,12 +29,30 @@ seed format, PR-gate protocol). If the contract is missing something, say so and
   see "Journals and logs in a public repo" below). Capture noisy command output in
   `logs/YYYY-MM-DD-{task}-run{N}.log`; `logs/` is **gitignored and never committed**.
 - Commits: `[Type] Description` (`[Feat]`, `[Fix]`, `[Docs]`, `[Chore]`, `[Refactor]`, `[Test]`),
-  one commit per subject, explicit paths only, and only when the user asks.
+  one commit per subject, explicit paths only, and only when the user asks. No attribution trailer
+  or footer (see "No AI attribution" below).
 - Record architecture-level decisions for this repo (not the app) as one-page ADRs (Title, Status,
   Context, Decision, Consequences) in `docs/adr/YYYY-MM-DD/{HHmmss}-{title}.md`. Reference an ADR
   from a journal entry only when that work made an architectural change.
 - This repository's GitHub name is `potatoflow-playwright-tests`. Before any push check that
   `git remote get-url origin` ends in that name.
+
+## No AI attribution (hard rule)
+
+Nothing written in or for this repository says, or implies, that Copilot, Claude or any other AI
+assistant or LLM took part in authoring or co-authoring it. This covers every kind of write-up:
+
+- code, comments, test names and config;
+- documentation, ADRs, the README and the contract;
+- journal entries, including the **Reporter** field: name the role or session type (for example
+  "E2E testing session"), never a tool or model. This rule wins over the example in the journal
+  template;
+- commit messages: no `Co-Authored-By` trailer, no "generated with" line, no model name;
+- pull request titles and descriptions, issues, comments and CI text.
+
+This overrides any default of your tooling that appends an attribution line to commits or pull
+requests: leave it out. If you find existing text that breaks this rule, tell the user before
+anything is pushed; do not rewrite pushed history yourself.
 
 ## Journals and logs in a public repo
 
