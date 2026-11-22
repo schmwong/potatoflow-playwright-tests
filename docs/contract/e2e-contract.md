@@ -1,6 +1,6 @@
 # PotatoFlow end-to-end contract
 
-**Contract version 2026-11-22.** Black-box interface only: how a run is started, what is seeded, the HTTP routes tests may call, and the screens, test ids and
+**Contract version 2026-11-23** (corrections to 2026-11-22: see the changelog at the end). Black-box interface only: how a run is started, what is seeded, the HTTP routes tests may call, and the screens, test ids and
 visible states a browser test can drive. It holds no source, schema, secrets or private design detail. If a test needs something that is not here, say so and ask
 the user to have it added; do not look for it elsewhere.
 
@@ -25,7 +25,7 @@ the same run locally. Run these in the **root folder of the application reposito
 |---|---|---|
 | once | `npm ci` | installs the pinned tools |
 | after any change | `npm run build` | makes the static app the run serves. Without it the run stops with `BUILD_MISSING` (unless `--api-only`) |
-| a run | `npm run e2e:serve -- <test command>` | starts the run, runs your command with the variables below set, stops the run, and exits with your command's exit code |
+| a run | `npm run e2e:serve -- <test command>` | starts the run, runs your command with the variables below set, stops the run, and exits with your command's exit code. It works the same on Windows, Linux and macOS: on Windows the test command may be `npm`, `npx` or any other program on PATH (for example `npm --prefix <folder> test`) |
 
 Options before the command: `--api-only` (no app, API routes only) and `--build-dir <folder>` (serve another build, for example a candidate). With no command it prints
 the variables as JSON and serves until Ctrl+C. `KEEP=1` keeps the run's folder for a developer (never in CI).
@@ -36,7 +36,7 @@ the variables as JSON and serves until Ctrl+C. `KEEP=1` keeps the run's folder f
 | Database | A fresh copy per run in a temporary folder, deleted when the run ends. **There is no path variable to set**; the seed's contents are in the file named by `E2E_SEED_SUMMARY` |
 | Ready | The command prints `ready at <E2E_BASE_URL>` to standard error, then `GET <E2E_BASE_URL>/healthz` answers `200` with `{ "status": "ok" }` (`503` with `"unhealthy"` if the database fails). Poll it before the first test |
 | Variables | `E2E_BASE_URL` (one origin for the app and `/api`), `E2E_APP_RELEASE` and `E2E_SCHEMA_VERSION` (send them as `appRelease` and `schemaVersion`), `E2E_SEED_SUMMARY` (path of a small JSON file; read it, never write it), and one `E2E_AUTH_<PERSON>` per seeded person: a ready-made `Authorization` header value, used unchanged |
-| Failures | Exit code `2` with `e2e <run id>: <fixed code>` on standard error. Nothing else is printed |
+| Failures | Exit code `2` with `e2e <run id>: <fixed code>` on standard error if the run itself cannot start. Exit code `127` with `e2e <run id>: the command could not be started` if the run started but your test command could not be launched (a name that is not on PATH). Nothing else is printed |
 
 A developer running the app by hand (not a test, not the gate): the backend listens on `127.0.0.1:3000` and answers `GET /healthz` the same way; `PORT` changes the
 port. The app is at `http://localhost:5173/` and forwards `/api` to the backend. Do not use that setup in a test.
@@ -58,7 +58,8 @@ What the seed does **not** contain, so a UI test has to create it through the sc
 - **No order on a paid invoice, no voided order, no order on a second draft.** Make them through the screens.
 
 **Missing for browser-driven tests (an app-side decision; nothing is promised):** a browser cannot *be* a seeded person. The `E2E_AUTH_<PERSON>` headers work for HTTP
-calls only; in a browser the app signs in through its own set-up (section 5.1), which needs one step at the server's console that a test cannot do. A test-only way to
+calls only; in a browser the app signs in through its own set-up (section 5.1), which needs one step at the server's console that a test cannot do, and a contract run has
+no pairing step at all (it uses the development sign-in), so a fresh browser's set-up screen cannot even show its number. A test-only way to
 enrol a browser as a seeded person, or a richer seed, would be an app-side addition (and, if it were an endpoint, would need the owner to relax ground rule 1).
 **Until then, browser-driven tests of orders and invoices cannot be written against this contract.** Tests of the HTTP routes, and of the signed-out screens, can.
 
@@ -86,6 +87,9 @@ The summary file is JSON: `people` (`name`, `userId`, `displayName`, `role`, `de
 `deliveryOrders` (`id`, `number`, `receiver` and `billed` as party codes, `invoice`: `null` or `{ status, number }`, a draft having `number: null`), `invoices`
 (`id`, `number`, `status`, `billed`). A printed delivery order never shows a price, a discount, a surcharge or the billed party.
 
+**Case matters.** An invoice's `status` (in `invoices` and inside an order's `invoice`) is **upper case**: `ISSUED` or `DRAFT`, never `issued` or `draft`. `plays` and a person's `role`
+(`account_admin`, `manager`, `viewer`) are lower case.
+
 **What these runs cannot prove.** They sign in with a development-only sign-in: the header is trusted by the server. So they do not exercise real device pairing, request
 signing, token rotation, revocation of a device or person, or the effect of switching a person off. Under this sign-in, switching a person off or changing their role does not
 change what that person's header can do. Do not write a test that expects it to. The development sign-in exists only in a server started for tests.
@@ -98,14 +102,24 @@ parameters. `requestId` is fresh text for each new action; **the same `requestId
 
 | Route | Method | Who | What it does |
 |---|---|---|---|
-| `/api/sync/pull` | GET | `manager`, `viewer` | Reads the records this role may see from the cursor `after`, at most `limit`. Answers `role`, `bundles`, `cursor`, `hasMore`. An `account_admin` gets `NOT_ALLOWED` |
-| `/api/admin/users` | GET | `account_admin` | Lists the people: name, role, whether active, the devices paired. Never a token, key or hash |
-| `/api/admin/users/add` | POST | `account_admin` | Adds `displayName` and `role` (`manager` or `viewer` only); the server makes the id |
+| `/api/sync/pull` | GET | `manager`, `viewer` | Reads the records this role may see from the cursor `after`, at most `limit`. **Both `after` and `limit` are required** (below). Answers `role`, `bundles`, `cursor`, `hasMore`. An `account_admin` gets `NOT_ALLOWED` |
+| `/api/admin/users` | GET | `account_admin` | Lists the people: name, role, whether active, the devices paired. Never a token, key or hash. Answers `{ people: [...] }` |
+| `/api/admin/users/add` | POST | `account_admin` | Adds `displayName` and `role` (`manager` or `viewer` only); the server makes the id. Answers `{ ok: true, person }` |
 | `/api/admin/users/rename` | POST | `account_admin` | Adds `userId`, `displayName` |
 | `/api/admin/users/role` | POST | `account_admin` | Adds `userId`, `role` (`manager` or `viewer` only) |
 | `/api/admin/users/deactivate` | POST | `account_admin` | Adds `userId`. Nobody can switch themself off; the last active `account_admin` can never be switched off |
 | `/api/admin/users/reactivate` | POST | `account_admin` | Adds `userId` |
 | `/healthz` | GET | anyone | Readiness, as in section 1 |
+
+**`GET /api/sync/pull`, in detail** (checked against a live run on 2026-11-23):
+
+- **`after`** is required: a whole number of 0 or more. **`0` reads from the start**; for the next page send the `cursor` the last answer gave. **`limit`** is required: a whole number of 1 or more (500 is accepted; do not rely on any upper bound).
+- A request **without `after`, without `limit`, with `limit=0`, or with a negative or non-numeric value** answers `400 BAD_REQUEST` ("The request could not be read."). Sending only `limit` is not a valid first request.
+- The answer carries `role` (the caller's role, lower case), `serverTime`, `minAppRelease`, `bundles` (a list), `cursor` (a whole number) and `hasMore` (true or false). It may also carry `drafts`, `editing` and `reviewCount`; do not assert that they are present or absent.
+- **What a pull carries:** reading a manager's or a viewer's pull from `after=0` to the end, the number of every seeded order and the number of the issued invoice appear **as text inside `bundles`**. The shape of a bundle is not part of the contract: look for the text, not for a field.
+- **The order of the checks** is: sign-in (`UNAUTHENTICATED`), then the role (`NOT_ALLOWED`: an `account_admin` is refused even with a malformed query), then the request's shape (`BAD_REQUEST`), then whether the device belongs to the header (`DEVICE_UNKNOWN`). So to test a device that does not belong to a header, send an otherwise well-formed request (`after=0&limit=…`); a malformed one answers `BAD_REQUEST` first.
+
+**The people routes' answers** (same run): `GET /api/admin/users` answers `{ people }`, each row with `userId`, `displayName`, `role`, `active`, `createdAt`, `updatedAt` and `devices`. `POST /api/admin/users/add` answers `{ ok: true, person }` where `person` has `userId`, `displayName`, `role`, `active`, `createdAt` and `updatedAt`. The id field is **`userId`**, never `id`.
 
 People are never deleted and there is no route to create an `account_admin`. A people change that works answers `200` with `{ ok: true, person }`; a refused one answers `{ ok: false, code }`
 with `NOT_ALLOWED` (403), `NOT_FOUND` (404), `LAST_ADMIN` (409) or `INVALID` (422: an empty name, a name over 80 characters or with control characters, or an unknown role).
@@ -143,13 +157,28 @@ Find things by `data-testid`. The visible words below are promised as of this ve
 
 | Screen / element | Test id | Visible text and state |
 |---|---|---|
-| Nobody is set up on this browser | `screen-setup` | Title "Set up PotatoFlow here"; the 2-digit number is `setup-code`; buttons `setup-try-again` ("Try again"), `setup-back` ("Go back") |
-| Picker | `screen-picker` | Title "Who is using PotatoFlow?"; one tile per person: `profile-<personId>`. The account admin's tile has the extra line "Looks after PotatoFlow"; manager and viewer tiles show no role |
-| "Someone new" tile | `profile-new` | "Someone new", with the hint "First ask the person who looks after PotatoFlow to tap “Add a phone or computer”". Opens `screen-setup` |
+| Nobody is set up on this browser | `screen-setup` | Title "Set up PotatoFlow here". It then shows **one of two things**: where the server offers pairing (a normal run, **not a contract run**), the 2-digit number as `setup-code`; otherwise `setup-problem` (one plain sentence) with `setup-try-again` ("Try again"). `setup-back` ("Go back") is there **only when at least one person is already set up on this browser** |
+| Picker | `screen-picker` | Shown only when at least one person is set up on this browser. Title "Who is using PotatoFlow?"; one tile per person: `profile-<personId>`. The account admin's tile has the extra line "Looks after PotatoFlow"; manager and viewer tiles show no role |
+| "Someone new" tile | `profile-new` | On the picker only. "Someone new", with the hint "First ask the person who looks after PotatoFlow to tap “Add a phone or computer”". Opens `screen-setup`, with `setup-back` |
 | Home (manager, viewer) | `screen-home` | Title "Hello, <name>."; `home-orders` ("Delivery orders"), `home-invoices` ("Invoices"), `switch-person` ("Switch person": back to the picker, no password) |
 | People (account admin) | `screen-people` | Title "People"; `open-letterhead` ("Letterhead"), `add-person` ("Add a person"), a row `person-<personId>` per person with `add-device-<personId>` ("Add a phone or computer"), `switch-off-<personId>` / `switch-on-<personId>` |
 
 Choosing a tile lands on **People for the account admin** and on **Home for a manager or viewer**. Person ids in test ids are the ones in the summary file.
+
+**What a fresh browser shows in a contract run** (verified against a live run on 2026-11-23). A contract run uses the development sign-in, which has **no pairing step**: the pairing routes are not served
+(they answer `404`), so the set-up screen can never be given a number. A browser with no stored data therefore opens on `screen-setup` and stays there:
+
+| Element | In a contract run, fresh browser |
+|---|---|
+| `screen-setup` | present, title "Set up PotatoFlow here" |
+| `setup-problem` | present, currently reading "There is no internet right now. Please check the connection, then press Try again." (the one sentence the set-up screen gives when it cannot reach the pairing service; do not read it as a network fault) |
+| `setup-try-again` | present and enabled; pressing it gives the same result |
+| `setup-code` | **absent**, and stays absent |
+| `setup-back` | **absent**: it needs someone already set up on the browser |
+| `screen-picker`, `profile-new`, `profile-<personId>` | **absent**: the picker needs someone set up on the browser, and a contract run has no way to set anyone up |
+
+So in a contract run a test can assert the first three rows and nothing past them. The `setup-code` number, `setup-back`, the picker and the tiles exist only in a normal run (where an account admin has opened
+the pairing window and a person has been set up on that browser), and this contract gives a test no way to reach them (section 2).
 
 | | account admin ("owner") | manager | viewer |
 |---|---|---|---|
@@ -220,8 +249,10 @@ is the file name offered to the browser:
 
 - The **order cards do not show the customer's code**: two same-name customers read alike on the Orders list. Only the Invoices list is disambiguated.
 - A list reads the browser's own copy when it opens and **does not refresh** when a sync lands. After pairing, or after the server makes draft invoices, leave the screen and open it again.
-- Signing in on a browser works only through the set-up flow: `screen-setup`, then the admin taps the matching number on `screen-pairing` (test ids `pairing-waiting`, `choice-<number>`, `choice-none`, `pairing-ok`). Section 2 says what is missing for a test to do that.
+- Signing in on a browser works only through the set-up flow: `screen-setup`, then the admin taps the matching number on `screen-pairing` (test ids `pairing-waiting`, `choice-<number>`, `choice-none`, `pairing-ok`). **That flow does not exist in a contract run** (section 5.1): do not assert `setup-code`, `setup-back`, the picker or a tile there. Section 2 says what is missing for a test to do that.
+- The sentence in `setup-problem` is the app's one wording for "could not reach the pairing service"; it may change. In a contract run assert that `setup-problem` is present, not its words.
 
 ## Changelog
 
+- **2026-11-23 (corrections; a test that relied on the earlier text may need changing):** (1) `sync/pull` needs **both** `after` and `limit`; a request without either answers `400 BAD_REQUEST` (section 4). (2) The seed summary's statuses are **upper case**, `ISSUED` and `DRAFT` (section 3). (3) Section 5.1 said `setup-code` and `setup-back` were always on `screen-setup`; they are not. In a contract run a fresh browser shows only `screen-setup`, `setup-problem` and `setup-try-again`, because there is no pairing step, and `setup-back` and the picker need someone already set up on the browser. (4) The people routes' answer shapes and what a pull carries are now written down (section 4). (5) `e2e:serve` accepts `npm`, `npx` and other `.cmd` programs as the test command on Windows, and says `127` when a command cannot be launched.
 - **2026-11-22 (additive):** first published copy in this repository. Start-up and readiness; what exists to seed and reset; the screen and test-id surface for sign-in, role visibility, orders (Edit order and its lock reasons, "View or print"), invoices (`Name · code` rows, the primary "View or print invoice", draft file names).

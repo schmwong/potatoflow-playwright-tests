@@ -2,7 +2,8 @@
 
 End-to-end tests for the PotatoFlow PWA, written with Playwright. The application under test is
 developed in a separate private repository; these tests reach it only through the contract in
-`docs/contract/`. **Status: setup phase, no tests yet.**
+`docs/contract/`. **Status: first suites written (HTTP contract and signed-out screens); browser tests of
+orders and invoices are blocked on the contract, see `docs/contract/e2e-contract.md` section 2.**
 
 This repository is public. Never commit secrets, tokens, auth state, customer data, traces or videos.
 
@@ -41,6 +42,30 @@ Notes:
   the app is the system under test; its address and test endpoints are in `docs/contract/`.
 - Windows and macOS commands come from the tools' public package catalogues and have not been run on
   this project; confirm with `<tool> --version`.
+
+## Running the tests
+
+The tests never start the app. A run is one throw-away server and database, started by the
+application's own harness, which sets `E2E_BASE_URL` (a free loopback port per run, so it never
+collides with a local UAT server), `E2E_AUTH_*` and the other variables the tests read. In the
+**application repository** (after its `npm ci` and `npm run build`; see the contract, section 1):
+
+```bash
+npm run e2e:serve -- npm --prefix <path-to-this-repo> test
+```
+
+| Command (in this repo) | What it runs |
+|------------------------|--------------|
+| `npm test` | everything |
+| `npm run test:api` | HTTP contract suite only (no browser) |
+| `npm run test:smoke` | browser smoke suite (`@smoke`) |
+| `npm run list` | lists the tests without a server |
+| `npm run typecheck` | type-checks the specs |
+
+Without `E2E_BASE_URL` the run stops at once with a plain message, and a non-loopback address is
+refused. Set `E2E_BROWSER_CHANNEL=chrome` (or `msedge`) to use the installed browser instead of the
+Playwright Chromium download. Output goes to the OS temp folder, not this folder; keep logs in
+`logs/` (gitignored).
 
 ## Check your setup
 

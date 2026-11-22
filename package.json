@@ -1,0 +1,22 @@
+{
+  "name": "potatoflow-playwright-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end tests for the PotatoFlow PWA. Black box: reached only through docs/contract/.",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test --project=api",
+    "test:smoke": "playwright test --project=ui --grep @smoke",
+    "list": "playwright test --list",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "^24.19.2",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
