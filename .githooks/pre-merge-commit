@@ -1,0 +1,22 @@
+#!/bin/sh
+# Managed copy. Master: potatoflow/shared/githooks/ (edit there, then run ./sync-shared.sh).
+# Blocks local merges while main/master is checked out.
+
+branch=$(git symbolic-ref --short -q HEAD 2>/dev/null)
+
+case "$branch" in
+  main|master)
+    {
+      echo ""
+      echo "############################################################"
+      echo "# BLOCKED: local merge into '$branch'"
+      echo "# main changes only through a reviewed pull request on GitHub."
+      echo "# Agents: stop here, quote this banner to the user and record"
+      echo "# it in the journal. Do NOT use --no-verify."
+      echo "############################################################"
+      echo ""
+    } >&2
+    exit 1
+    ;;
+esac
+exit 0

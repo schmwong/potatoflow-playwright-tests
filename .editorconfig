@@ -1,0 +1,12 @@
+# https://editorconfig.org  Shared by every PotatoFlow repo. Most editors read it (Zed, VS Code with the
+# EditorConfig extension, JetBrains). It only sets the basics; indentation follows each file's existing style.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false

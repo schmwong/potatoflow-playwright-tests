@@ -1,0 +1,21 @@
+# Line endings: LF on every OS (Linux, macOS, Windows 11) so diffs and shell scripts stay clean.
+# Set `git config core.autocrlf false` on Windows so this file decides, not the global setting.
+* text=auto eol=lf
+*.sh text eol=lf
+.githooks/* text eol=lf
+
+# Binary files: never converted or diffed as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.wasm binary
+*.zip binary
+*.sqlite binary
+*.sqlite3 binary
+*.db binary

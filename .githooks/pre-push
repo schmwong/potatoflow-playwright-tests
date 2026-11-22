@@ -1,0 +1,33 @@
+#!/bin/sh
+# Managed copy. Master: potatoflow/shared/githooks/ (edit there, then run ./sync-shared.sh).
+# Blocks pushes that update refs/heads/main or refs/heads/master on the remote.
+# Exception: creating the branch on a remote that does not have it yet (remote sha all zeros),
+# so the first push of a new repo works.
+# stdin lines: <local ref> <local sha> <remote ref> <remote sha>
+
+blocked=""
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/master)
+      case "$remote_sha" in
+        *[!0]*) blocked="$blocked $remote_ref" ;;
+      esac
+      ;;
+  esac
+done
+
+if [ -n "$blocked" ]; then
+  {
+    echo ""
+    echo "############################################################"
+    echo "# BLOCKED: push to$blocked"
+    echo "# main is PR-only. Push a feature branch and open a pull request."
+    echo "# Agents: stop here, quote this banner to the user and record"
+    echo "# it in the journal. Do NOT use --no-verify."
+    echo "############################################################"
+    echo ""
+  } >&2
+  exit 1
+fi
+exit 0

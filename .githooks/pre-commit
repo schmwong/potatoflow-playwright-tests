@@ -1,0 +1,35 @@
+#!/bin/sh
+# Managed copy. Master: potatoflow/shared/githooks/ (edit there, then run ./sync-shared.sh).
+# Blocks commits made directly on main/master. The only exception is the very first commit of a
+# brand-new repo (no commits exist yet), so a repo can be bootstrapped. In public repos it also runs the leak scan.
+
+branch=$(git symbolic-ref --short -q HEAD 2>/dev/null)
+
+case "$branch" in
+  main|master)
+    if git rev-parse --verify -q HEAD >/dev/null 2>&1; then
+      {
+        echo ""
+        echo "############################################################"
+        echo "# BLOCKED: direct commit on '$branch'"
+        echo "# main is PR-only. Create a branch and open a pull request:"
+        echo "#   git switch -c feat/<short-name>"
+        echo "# Agents: stop here, quote this banner to the user and record"
+        echo "# it in the journal. Do NOT use --no-verify."
+        echo "############################################################"
+        echo ""
+      } >&2
+      exit 1
+    fi
+    ;;
+esac
+
+# Public repositories carry scripts/check-public.sh (synced from the workspace). Refuse the commit if it
+# finds source, secrets, addresses or forbidden workflow patterns. Private repos do not have the script.
+if [ -f scripts/check-public.sh ]; then
+  sh scripts/check-public.sh >&2 || {
+    echo "# BLOCKED: public-repo scan failed. Fix the findings above. Do NOT use --no-verify." >&2
+    exit 1
+  }
+fi
+exit 0
